@@ -1,10 +1,11 @@
 #import sys
 import argparse
+import math
 # generate a dictionary contain the HMM model
 
 parser = argparse.ArgumentParser( prog='build HMM model',description="using fastafiles from IMGT", epilog='python HMMbuilder.py -i inputfile -o outputfile')
 parser.add_argument ('-i','--input',help='Input File Name', default="./data/mFR1.txt")
-#parser.add_argument('-5','--head', help="trim 5' region", default='store_true')
+parser.add_argument('-n','--size', help="string size", default=8)
 #parser.add_argument('-o','--output',help='Output File Name',required="true")
 parser.print_help()
 args=parser.parse_args()
@@ -69,7 +70,7 @@ def median(fastaDic):
 	return lenSeq[media_pos-1]
 
 ##-----------generate the AA count matrix---------------------------------------#
-def generate_AA_matrix(trunFastaDic,string_size, is5prime):
+def get_PWM_table(trunFastaDic,string_size, is5prime):
 
 	for entryName in trunFastaDic:
 		seq=trunFastaDic[entryName]
@@ -77,39 +78,47 @@ def generate_AA_matrix(trunFastaDic,string_size, is5prime):
 			print "Error:the request matrix string size is bigger than the fasta "
 			return 
 
+	# count the amino acid in each position
 	count_matrix={}
+	delta=0.000001 
 	if is5prime:	
-		for i in range(string_size-1):
+		for i in range(string_size):
 			pos_matrix={}
 			aminoAcids='ARNDCEQGHILKMFPSTWYV'
-			for aminoAcid in aminoAcids:
+			for aminoAcid in aminoAcids: # initiate the 0 count, without it, error occur
 				pos_matrix[aminoAcid]=0
-
-			for entryName in trunFastaDic:
+			for entryName in trunFastaDic:# count absolute times
 				pos_matrix[trunFastaDic[entryName][i]] += 1
-
+			for aminoAcid in pos_matrix:
+				pos_matrix[aminoAcid]=math.log( float(pos_matrix[aminoAcid])/len(trunFastaDic)/0.05 +delta)
 			count_matrix[i]=pos_matrix
 	else:
 		for i in range(len(seq)-string_size,len(seq)):
 			pos_matrix={}
-			aminoAcids='ARNDCEQGHILKMFPSTWYV'
-			for aminoAcid in aminoAcids:
+			aminoAcids='ARNDCEQGHILKMFPSTWYV'	
+			for aminoAcid in aminoAcids: # initiate the 0 count, without it, error occur
 				pos_matrix[aminoAcid]=0
-
-			for entryName in trunFastaDic:
+			for entryName in trunFastaDic:# count absolute times
 				pos_matrix[trunFastaDic[entryName][i]] += 1
-
-			count_matrix[i+string_size-len(seq)]=pos_matrix			
-
-	# print the resulting dictionary for checkup
+			for aminoAcid in pos_matrix:
+				#pos_matrix[aminoAcid]=float(pos_matrix[aminoAcid])/len(trunFastaDic)/0.05
+				pos_matrix[aminoAcid]=math.log( float(pos_matrix[aminoAcid])/len(trunFastaDic)/0.05 +delta)
+			count_matrix[i]=pos_matrix
+			#count_matrix[i+string_size-len(seq)]=pos_matrix	
+	#print the resulting dictionary for checkup
 	for key in count_matrix:
 		print "position " + str(key)
 		print count_matrix[key]
-
+	#print count_matrix
 	return count_matrix
+#---------------------------calculate score of given sequence------------------#
+# def cal_PMW_score (PMW_dict,string):
+# 	for i in string:
+# 		score = PMW_dict[i][string[i]]
+# 		print score
 
 
-########## prepare input and output files ###############################
+#--------------- prepare input and output files ------------------------------#
 Infilename1 = args.input
 Infile1 = open(Infilename1, 'r')
 	
@@ -135,7 +144,9 @@ print str(len(allFasta))+' sequences have been writen into ' + Outfilename1 + '\
 medianLenth=median(allFasta)
 cleanedFasta=remove_outlier(allFasta,medianLenth)
 
-AA_matrix=generate_AA_matrix(cleanedFasta,8, False)
+PMW_table= get_PWM_table(cleanedFasta,args.size, False)
+score = cal_PMW_score(PMW_table,"PGAELVKPGASVKLSCKAS")
+print score
 
 for key in cleanedFasta:
 	Outfile1.write(str(key) + "\t" + cleanedFasta[key] + '\n')
