@@ -4,12 +4,17 @@ import math
 import json
 # generate a dictionary contain the HMM model
 
-parser = argparse.ArgumentParser( prog='build HMM model',description="using fastafiles from IMGT", epilog='python HMMbuilder.py -i inputfile -o outputfile')
-parser.add_argument ('-i','--input',help='Input File Name', default="./data/mFR1.txt")
+parser = argparse.ArgumentParser( prog='build HMM model',description="python get_PMW_table.py -p data -s mouse -i FR1.txt -n 6  -t", epilog='python get_PMW_table.py -i inputfile -n string_size [-t]')
+parser.add_argument ('-p','--pathway',help="folder")
+parser.add_argument('-s','--species', help='mouse, rabbit or human')
+parser.add_argument ('-i','--input',help='Input File Name', default="FR1.txt")
 parser.add_argument('-n','--size', help="string size", default=6)
 parser.add_argument('-t','--tail',help='3 prime end',action='store_false')
+
 parser.print_help()
 args=parser.parse_args()
+
+# for example: python get_PMW_table.py -p data -s mouse -i FR1.txt -n 6  -t
 
 ##show values##
 #print (parser.print_help())
@@ -76,13 +81,16 @@ def get_PWM_table(trunFastaDic,string_size, is5prime):
 
 	for entryName in trunFastaDic:
 		seq=trunFastaDic[entryName]
+		# print "string_size is " + str(string_size)
+		# print "length of seq is " + str(len(seq))
+		# print string_size> len(seq)
 		if string_size> len(seq):
 			print "Error:the request matrix string size is bigger than the fasta "
 			return 
 
 	# count the amino acid in each position
 	count_matrix={}
-	delta=0.000001 
+	delta=0.0000000001 
 	if is5prime:	
 		for i in range(string_size):
 			pos_matrix={}
@@ -105,8 +113,8 @@ def get_PWM_table(trunFastaDic,string_size, is5prime):
 			for aminoAcid in pos_matrix:
 				#pos_matrix[aminoAcid]=float(pos_matrix[aminoAcid])/len(trunFastaDic)/0.05
 				pos_matrix[aminoAcid]=math.log( float(pos_matrix[aminoAcid])/len(trunFastaDic)/0.05 +delta)
-			count_matrix[i]=pos_matrix
-			#count_matrix[i+string_size-len(seq)]=pos_matrix	
+			#count_matrix[i]=pos_matrix
+			count_matrix[i+string_size-len(seq)]=pos_matrix	
 	#print the resulting dictionary for checkup
 	# for key in count_matrix:
 	# 	print "position " + str(key)
@@ -115,11 +123,10 @@ def get_PWM_table(trunFastaDic,string_size, is5prime):
 
 	return count_matrix
 
-
-
-
 ############################## main ##############################################
-allFasta = read_ProFastaFiles(args.input)
+inputfilename=args.pathway+'/'+args.species+'/'+args.input
+print "input file name is " + inputfilename
+allFasta = read_ProFastaFiles(inputfilename)
 print str(len(allFasta))+' sequences have been read.'
 
 #remove key value pair , whose sequence lenth is too short
@@ -128,11 +135,16 @@ cleanedFasta=remove_outlier(allFasta,medianLenth)
 print str(len(cleanedFasta))+' sequences are used for generate PMW table.'
 
 # genreate PWMtable, write it to Json format
-PWMtable=get_PWM_table(cleanedFasta,args.size, args.tail)
+
+
+PWMtable=get_PWM_table(cleanedFasta,int(args.size), args.tail)
+
+
 if args.tail :
-	PWMtable_name=args.input.rstrip(".txt")+"_"+str(args.size)+"_head_PMW_table.json"
+	PWMtable_name=inputfilename.rstrip('.txt')+"_head_PMW"+'_'+args.species+".json"
 else:
-	PWMtable_name=args.input.rstrip(".txt")+"_"+str(args.size)+"_tail_PMW_table.json"
+	PWMtable_name=inputfilename.rstrip('.txt')+"_tail_PMW"+'_'+args.species+".json"
+
 with open(PWMtable_name,'w') as fp:
 	json.dump(PWMtable,fp)
 print "json file has been writen to the file:" + PWMtable_name
@@ -140,7 +152,7 @@ print "json file has been writen to the file:" + PWMtable_name
 # get PMWtable dictionary from Json format
 with open(PWMtable_name,'r') as fp:
 	read_PMW_dict=json.load(fp)
-for key in read_PMW_dict:
-	print "position " + str(key)
-	print read_PMW_dict[key]
+# for key in read_PMW_dict:
+# 	print "position " + str(key)
+# 	print read_PMW_dict[key]
 #print read_PMW_dict
